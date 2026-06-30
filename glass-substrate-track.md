@@ -12,7 +12,8 @@
 
 - 產業主題：{{玻璃基板}}
 - 追蹤範圍：{{FOPLP / FOWLP}}
-- 已有研究基準：{{參考 glass-substrate-supply-chain.md}}
+- 先用 WebFetch 讀取 https://raw.githubusercontent.com/wentseng771/glass-substrate/main/glass-substrate-supply-chain.docx 作為研究基準
+
 - 關鍵公司：{{ }}
 - 關鍵技術/產品詞：{{TGV 核心製程/FOPLP 大板翹曲解法}}
 - 關鍵地區：{{例如台灣、美國、中國、全球}}
