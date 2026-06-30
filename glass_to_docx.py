@@ -1,0 +1,336 @@
+from docx import Document
+from docx.shared import Pt, RGBColor, Inches, Cm
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
+import re
+
+doc = Document()
+
+# ── 全域設定 ──────────────────────────────────────────
+section = doc.sections[0]
+section.left_margin  = Cm(2.0)
+section.right_margin = Cm(2.0)
+section.top_margin   = Cm(2.0)
+section.bottom_margin= Cm(2.0)
+
+FONT_ZH  = 'Microsoft JhengHei'
+FONT_EN  = 'Calibri'
+FONT_MONO= 'Courier New'
+
+def set_font(run, size=11, bold=False, color=None, mono=False):
+    run.font.name = FONT_MONO if mono else FONT_ZH
+    run.font.size = Pt(size)
+    run.bold = bold
+    if color:
+        run.font.color.rgb = RGBColor(*color)
+    rpr = run._r.get_or_add_rPr()
+    rFonts = OxmlElement('w:rFonts')
+    rFonts.set(qn('w:ascii'), FONT_MONO if mono else FONT_EN)
+    rpr.insert(0, rFonts)
+
+def add_heading(text, level=1):
+    p = doc.add_heading(text, level=level)
+    for run in p.runs:
+        run.font.name = FONT_ZH
+        run.font.size = Pt({1:16, 2:13, 3:11.5}.get(level, 11))
+    return p
+
+def add_para(text='', bold=False, size=10.5, indent=False):
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(1)
+    p.paragraph_format.space_after  = Pt(1)
+    if indent:
+        p.paragraph_format.left_indent = Cm(0.5)
+    run = p.add_run(text)
+    set_font(run, size=size, bold=bold)
+    return p
+
+def add_bullet(text, level=0):
+    p = doc.add_paragraph(style='List Bullet')
+    p.paragraph_format.space_before = Pt(1)
+    p.paragraph_format.space_after  = Pt(1)
+    p.paragraph_format.left_indent  = Cm(0.4 + level*0.4)
+    run = p.add_run(text)
+    set_font(run, size=10)
+    return p
+
+def shade_cell(cell, hex_color='D9EAF7'):
+    tc   = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    shd  = OxmlElement('w:shd')
+    shd.set(qn('w:val'),   'clear')
+    shd.set(qn('w:color'), 'auto')
+    shd.set(qn('w:fill'),  hex_color)
+    tcPr.append(shd)
+
+def style_table(table):
+    table.style = 'Table Grid'
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    for i, row in enumerate(table.rows):
+        for cell in row.cells:
+            cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+            for para in cell.paragraphs:
+                para.paragraph_format.space_before = Pt(2)
+                para.paragraph_format.space_after  = Pt(2)
+                for run in para.runs:
+                    set_font(run, size=9.5)
+        if i == 0:
+            for cell in row.cells:
+                shade_cell(cell, 'BDD7EE')
+                for para in cell.paragraphs:
+                    for run in para.runs:
+                        run.bold = True
+
+def make_table(headers, rows, col_widths=None):
+    table = doc.add_table(rows=1+len(rows), cols=len(headers))
+    style_table(table)
+    # header row
+    for j, h in enumerate(headers):
+        cell = table.cell(0, j)
+        cell.paragraphs[0].clear()
+        run = cell.paragraphs[0].add_run(h)
+        set_font(run, size=9.5, bold=True)
+    # data rows
+    for i, row_data in enumerate(rows):
+        for j, val in enumerate(row_data):
+            cell = table.cell(i+1, j)
+            cell.paragraphs[0].clear()
+            run = cell.paragraphs[0].add_run(str(val))
+            set_font(run, size=9.5)
+        if i % 2 == 0:
+            for cell in table.rows[i+1].cells:
+                shade_cell(cell, 'EBF3FB')
+    # col widths
+    if col_widths:
+        for j, w in enumerate(col_widths):
+            for row in table.rows:
+                row.cells[j].width = Cm(w)
+    doc.add_paragraph()
+    return table
+
+
+# ══════════════════════════════════════════════════════
+#  封面 / 標題
+# ══════════════════════════════════════════════════════
+p = doc.add_paragraph()
+p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run = p.add_run('玻璃基板供應鏈投資研究')
+set_font(run, size=18, bold=True)
+
+p2 = doc.add_paragraph()
+p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run2 = p2.add_run('建立日期：2026/06/06　|　最後更新：2026/06/06\n資料來源：UDN 經濟日報、Vocus/Cipher、CMoney 論壇、PhotonCap、Sohu/財聯社')
+set_font(run2, size=9, color=(128,128,128))
+
+doc.add_paragraph()
+
+# ══════════════════════════════════════════════════════
+#  一、報告大綱
+# ══════════════════════════════════════════════════════
+add_heading('一、報告大綱（六節架構）', 1)
+
+# 1. 產業背景
+add_heading('1. 產業背景（AI/HPC、HBM、先進封裝需求）', 2)
+bullets1 = [
+    'AI 加速器封裝面積持續擴大（NVIDIA Blackwell → Rubin → Feynman），突破單一 reticle 限制（858mm²），有機基板 CoWoS 在大尺寸封裝下翹曲/良率問題日趨嚴重',
+    'HBM4 頻寬需求倍增，要求基板信號損耗更低（Dk/Df 更小），傳統有機 ABF 材料的高頻損耗逼近物理極限',
+    '東吳證券定義玻璃基板為「AI 時代先進封裝的新一代底座」；PhotonCap（2026/05）：2026 年為玻璃基板從 R&D 跨入 pilot/qualification 的元年',
+]
+for b in bullets1:
+    add_bullet(b)
+
+# 2. 技術對照表
+add_heading('2. 玻璃基板技術與競品對照', 2)
+make_table(
+    ['封裝技術','基板材料','尺寸限制','翹曲控制','成本','成熟度'],
+    [
+        ['CoWoS-L', '有機 ABF', '300mm 晶圓', '中等', '高', '量產中'],
+        ['CoPoS',   '玻璃面板', '510×515mm', '優（CTE 可調）', '高（初期）', '試產線建置'],
+        ['FOPLP',   '玻璃/有機面板', '510×515mm', '需補償技術', '低（−20～30%）', '客戶驗證中'],
+        ['FOWLP',   '有機', '300mm 晶圓', '中等', '中', '量產中'],
+    ],
+    col_widths=[2.5, 3.0, 3.0, 3.0, 2.0, 3.0]
+)
+
+add_para('▶ TGV 核心製程：雷射改質（LIDE）→ 濕蝕刻 → 銅電鍍 → RDL 佈線 → 封裝', bold=True)
+add_para('▶ FOPLP 大板翹曲解法：Nikon DSP-100 數位投影曝光（Adaptive Patterning，±0.3μm 補償）+ 鈦昇雷射動態補償')
+
+# 3. 台積電策略
+add_heading('3. 台積電策略與本土供應鏈', 2)
+add_para('台積電 CoPoS 官方時程（截至 2026/06/04 股東會）', bold=True)
+make_table(
+    ['項目','內容'],
+    [
+        ['魏哲家聲明', '試產線已建置，2–3 年才會較大規模生產'],
+        ['量產時程',   '2028H2–2029H1（原市場預期 2027 底，股東會後修正後移一年）'],
+        ['Digitimes（2026/05/08）', '台積電積極推動 CoPoS 獨家供應條款'],
+        ['CoWoS-L 目標', '2026 年底月產能 13 萬片（短期仍以 CoWoS 為主力）'],
+    ],
+    col_widths=[5.0, 10.5]
+)
+
+add_para('Intel 玻璃基板製造佈局（多點並進）', bold=True)
+make_table(
+    ['地點','內容'],
+    [
+        ['Arizona Fab 21',        'TGV 設備已導入（鈦昇供應）'],
+        ['新墨西哥 Rio Rancho',    '宣佈建設美國首個玻璃基板量產製造基地'],
+        ['印度 Odisha（與 3DGS）', '$33 億投資，年產 7 萬片玻璃基板 + 5 千萬組裝單元'],
+    ],
+    col_widths=[4.5, 11.0]
+)
+
+# 4. 供應鏈公司分組
+add_heading('4. 供應鏈公司分組', 2)
+
+add_para('Tier 1：玻璃材料層', bold=True)
+make_table(
+    ['公司','代號','角色','備註'],
+    [
+        ['AGC 旭硝子',      '5201.T',  '玻璃原料+基板製造',   '子公司 Absolics 進入 AMD 認證（Georgia Covington 廠）'],
+        ['日本電氣硝子（NEG）','5214.T', '玻璃面板原料',       'CoPoS 關鍵材料供應候選'],
+        ['Corning',         'GLW',      '特種玻璃',           'Valor Glass 系列'],
+        ['Schott AG',       '未上市',   '玻璃原料',           'LIDE 製程玻璃'],
+        ['台玻（1802.TW）★', '1802',    '玻璃面板原料候選',   '台灣本土，目前仍在布局期，題材大於基本面'],
+        ['長興材料（1717.TW）★','1717', 'Buffer Layer 材料（SiO₂/SiNₓ、PI）', 'CoPoS TGV 結構緩衝應力材料'],
+    ],
+    col_widths=[4.0, 2.5, 4.0, 5.0]
+)
+
+add_para('Tier 2：TGV + 製程設備層', bold=True)
+make_table(
+    ['公司','代號','角色','備註'],
+    [
+        ['鈦昇科技（8027.TWO）★','8027',     'TGV 雷射改質（LIDE）、FOPLP 翹曲補償、電漿清洗、光學檢測', 'Intel IFS 關鍵設備廠；E-Core System 主導者'],
+        ['EO Technics',          '039030.KS','雷射設備（Samsung/Intel 長期供應商）',                     '鈦昇最主要競爭對手'],
+        ['Manz',                 'M5Z.DE',   '濕製程/蝕刻設備',                                         'E-Core System 成員'],
+        ['Nikon（7731.T）★',     '7731',     'DSP-100 數位投影曝光系統',                                 'FOPLP Die Shift 補償；Adaptive Patterning'],
+        ['AT&S',                 'ATS.VI',   '多層基板製造+設備',                                        '奧地利，PhotonCap 15 家公司之一'],
+    ],
+    col_widths=[4.0, 2.5, 4.5, 4.5]
+)
+
+add_para('Tier 3：基板製造層', bold=True)
+make_table(
+    ['公司','代號','角色','備註'],
+    [
+        ['欣興電子（3037.TW）★','3037', 'ABF 載板 → 玻璃基板轉型',   '台積電 CoPoS 合作候選；ABF 週期轉換期'],
+        ['Ibiden',              '4062.T','ABF 基板 → 玻璃',          '日本，Intel 長期 ABF 供應商'],
+        ['Absolics（未上市）',   '—',   '玻璃基板製造',               'AGC 子公司；Georgia 廠；2026 進入 AMD 認證'],
+        ['3DGS',                '未上市','玻璃基板製造（印度）',       'Intel 合作夥伴；Odisha 廠'],
+        ['群創光電（3481.TW）★', '3481',  '面板廠轉型玻璃基板製造',     '10.5代廠大尺寸玻璃處理能力；TFT Array 製程與 RDL 佈線高度相似；仍需補 TGV 設備與半導體級良率管理'],
+    ],
+    col_widths=[4.0, 2.5, 4.0, 5.0]
+)
+
+add_para('Tier 4：封裝/OSAT 層', bold=True)
+make_table(
+    ['公司','代號','角色'],
+    [
+        ['日月光（3711.TW）','3711', 'FOPLP 封裝服務'],
+        ['鴻海（2317.TW）',  '2317', 'CoPoS 封裝合作意圖'],
+        ['Amkor',            'AMKR', '美國先進封裝，Arizona 鄰近台積電 Fab 21'],
+    ],
+    col_widths=[4.5, 2.5, 8.5]
+)
+
+# 5. 風險與變數
+add_heading('5. 風險與變數', 2)
+make_table(
+    ['風險類別','風險項目','說明'],
+    [
+        ['時程風險','CoPoS 量產再度後移',    '從「幾年」（2026/04）→「2-3年」（2026/06），修正至 2028H2–2029H1；翹曲/良率/量產效率三大挑戰未突破'],
+        ['時程風險','Intel IFS 執行力',     'TerraFab/Tesla 合作若延遲，設備採購遞延風險高'],
+        ['競爭風險','中國玻璃基板自建（Tau Law）','華為以「Tau Law」將玻璃基板置於封裝核心，可能壓縮台灣設備廠 TAM'],
+        ['競爭風險','韓國 EO Technics',     'Samsung + Intel 雙客戶，TGV 設備市場正面競爭'],
+        ['競爭風險','Intel 多點投資分散採購','三地同時投資可能引入不同設備競標'],
+        ['技術風險','大面板翹曲',           '非線性隨面積放大，510×515mm 面板良率邊界仍在驗證中'],
+        ['技術風險','CPO 技術路線競爭',     '玻璃基板可承載光電共封，但 CPO 若獨立發展可能分食需求'],
+        ['財務風險','驗收認列波動',         '大型訂單以驗收為收入基準，造成季度脈衝式波動（鈦昇 2026Q1 EPS -0.22）'],
+        ['財務風險','客戶集中度',           '鈦昇高度依賴 Intel，欣興高度依賴 TSMC/Intel ABF 轉換'],
+    ],
+    col_widths=[2.8, 4.5, 8.2]
+)
+
+# 6. 投資思路框架
+add_heading('6. 投資思路框架（PhotonCap GVM 5軸）', 2)
+add_para('GVM Score 評估框架', bold=True)
+make_table(
+    ['評估軸','名稱','說明／範例'],
+    [
+        ['1','製程瓶頸控制度', '是否掌握不可替代的製程節點（鈦昇 TGV ★★★★★）'],
+        ['2','客戶認證深度',   '進入幾家一線廠驗證/量產（Absolics → AMD 認證）'],
+        ['3','資本回收能見度', 'Capex 何時轉為 EPS（橋頭新廠 2026 Q3）'],
+        ['4','訂單管線深度',   '能見度到哪個季度（鈦昇：2026 Q3 確認）'],
+        ['5','多應用就緒度',   '能否同時吃到 TGV + FOPLP + Intel + TSMC（鈦昇雙軌）'],
+    ],
+    col_widths=[1.5, 4.0, 10.0]
+)
+
+add_para('PhotonCap 四階梯時序（每階梯滯後 6–12 個月）', bold=True)
+make_table(
+    ['階梯','分類','說明'],
+    [
+        ['1','材料廠（Tier 1）',     '玻璃原料、Buffer Layer，最早期布局'],
+        ['2','設備廠（Tier 2）★',    '最早放量；TGV + FOPLP 設備需求先行'],
+        ['3','基板製造廠（Tier 3）', '設備交機後 6–12 個月產能爬坡'],
+        ['4','Adjacent（Tier 4）',   '封裝/OSAT 後段受惠'],
+    ],
+    col_widths=[1.5, 5.0, 9.0]
+)
+
+# ══════════════════════════════════════════════════════
+#  二、產業時間線
+# ══════════════════════════════════════════════════════
+doc.add_page_break()
+add_heading('二、產業時間線', 1)
+make_table(
+    ['時間','事件'],
+    [
+        ['2023–2024',      '鈦昇 PPE 逆勢擴張 +2.64億（+22.4%）；欣興 ABF 週期低谷，玻璃基板研發投入'],
+        ['2025/09',        '鈦昇美國 Arizona 子公司成立（Lab-to-Fab）'],
+        ['2025/12',        '鈦昇月營收 4.19億（近44個月高點）；YoY +146.45%'],
+        ['2026/04',        '鈦昇 4月月營收 ~1.57億；YoY +24.85%\n魏哲家：「正在搭建 CoPoS 試產線，預計幾年後量產」'],
+        ['2026/05/05',     'PhotonCap「The Glass Beneath AI Chips +255% YTD」'],
+        ['2026/05/08',     'PhotonCap「15家玻璃基板供應鏈公司評分地圖」\nAbsolics 進入 AMD Georgia Covington 廠認證\nDigitimes：台積電積極推動 CoPoS 獨家供應條款'],
+        ['2026/05/12',     'Digitimes：「Intel\'s revival secret」+ 華為 Tau Law\nCnyes：CoWoS→CoPoS 技術深度報導'],
+        ['2026/05',        '鈦昇 5月月營收 2.23億；YoY +140.17%；MoM +41.86%'],
+        ['2026/05/27–29',  'iTGV2026 國際玻璃通孔技術論壇（無錫）'],
+        ['2026/06/04',     '台積電股東會：魏哲家「CoPoS 試產線已建置，2-3年才會較大規模生產」→ 量產時程修正至 2028H2–2029H1\nIntel + 3DGS 宣佈印度 Odisha 玻璃基板廠（$33億）\nIntel 新墨西哥 Rio Rancho 玻璃基板製造基地公告'],
+        ['2026 Q3（預期）', '鈦昇橋頭科學園區新廠啟用（產能 ×1.8 + 電漿代工服務）'],
+        ['2026（預期）',    'TGV 美系客戶小量產開始；FOPLP 新增國際客戶'],
+        ['2027–2028（預期）','TGV 玻璃基板設備擴大交機'],
+        ['2028H2–2029H1（官方）','CoPoS 量產放量'],
+    ],
+    col_widths=[4.0, 11.5]
+)
+
+# ══════════════════════════════════════════════════════
+#  三、新增供應鏈公司
+# ══════════════════════════════════════════════════════
+add_heading('三、新增供應鏈公司（2026/06 更新）', 1)
+make_table(
+    ['公司','層級','新增原因'],
+    [
+        ['台玻（1802）',      '材料',    'CoPoS 玻璃面板原料題材，CMoney 報導；仍在布局期'],
+        ['Absolics（未上市）','基板製造','AMD 認證進入，客戶端多元化突破'],
+        ['Nikon（7731.T）',   '製程設備','DSP-100 Die Shift 補償，FOPLP 關鍵設備'],
+        ['長興材料（1717）',  '材料',    'Buffer Layer 材料，Cnyes 點名 CoPoS 供應鏈新星'],
+        ['3DGS',              '基板製造','Intel 印度廠合作夥伴'],
+        ['群創光電（3481）★', '基板製造','10.5代廠玻璃處理能力轉型；TFT Array 製程可對接 RDL；低 CAPEX 轉型故事'],
+    ],
+    col_widths=[4.0, 3.0, 8.5]
+)
+
+doc.add_paragraph()
+p_note = doc.add_paragraph()
+p_note.alignment = WD_ALIGN_PARAGRAPH.CENTER
+run_note = p_note.add_run('＊ 資料僅供研究參考，不構成投資建議 ＊')
+set_font(run_note, size=9, color=(128,128,128))
+
+# ── 儲存 ──────────────────────────────────────────────
+out = r'C:\Users\yehwe\Downloads\wt-ccagent\glass-substrate-supply-chain.docx'
+doc.save(out)
+print(f'Done: {out}')
