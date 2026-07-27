@@ -12,9 +12,9 @@
 
 - 產業主題：{{玻璃基板}}
 - 追蹤範圍：{{FOPLP / FOWLP}}
-- 先用 WebFetch 讀取 https://raw.githubusercontent.com/wentseng771/glass-substrate/main/glass-substrate-supply-chain.docx 作為研究基準
+- 先用 WebFetch 讀取 https://raw.githubusercontent.com/wentseng771/glass-substrate/main/glass-substrate-supply-chain.md 作為研究基準
 
-- 關鍵公司：{{ }}
+- 關鍵公司：{{Intel、TSMC、Lens Technology、鈦昇、Samsung、Dongwoo、Ibiden、群創、欣興、Absolics、SKC}}
 - 關鍵技術/產品詞：{{TGV 核心製程/FOPLP 大板翹曲解法}}
 - 關鍵地區：{{例如台灣、美國、中國、全球}}
 - 時間範圍：最近 7 天
@@ -70,6 +70,7 @@ Step 4. 產出每週追蹤報告
 
 - 報告結構必須包含：
 
+  ```markdown
   # {{產業名稱}} 每週追蹤報告（{{YYYY-MM-DD}}）
 
   ## 本週重點
@@ -89,6 +90,7 @@ Step 4. 產出每週追蹤報告
 
   ## 來源清單
   - 列出本次引用的主要來源與 URL
+  ```
 
 Step 5. 輸出檔案
 
@@ -97,7 +99,7 @@ Step 5. 輸出檔案
 Step 6. 寄送郵件
 
 - 若系統中已有可用的 email 工具 / MCP / plugin（例如 Resend、Gmail MCP、Outlook MCP），
-  請將這份 `.md` 報告作為附件或內文寄送到：{{你的Email}}
+  請將這份 `.md` 報告作為附件或內文寄送到：yehwentseng@gmail.com
 - Email 標題格式：
   \[每週追蹤] {{產業名稱}} 供應鏈更新 - {{YYYY-MM-DD}}
 - Email 內文請包含：
